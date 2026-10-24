@@ -6,11 +6,12 @@ on:
   pull_request:
 
 jobs:
+  # Type stripping for running .ts tests directly requires Node 22.6+.
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22, 24]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,3 +22,17 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The published package is plain JavaScript, so verify it still builds and
+  # loads on the oldest runtime declared in `engines`.
+  build-min-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: node dist/cli.js help
