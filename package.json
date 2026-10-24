@@ -1,0 +1,53 @@
+{
+  "name": "stacklore",
+  "version": "0.1.0",
+  "description": "Preserve the prompts and intent behind every layer of a stacked pull request, in a private store.",
+  "keywords": [
+    "stacked-pull-requests",
+    "prompts",
+    "provenance",
+    "ai",
+    "github",
+    "context"
+  ],
+  "license": "MIT",
+  "author": "aditya-dua",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aditya-dua/stacklore.git"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "default": "./dist/adapters/index.js"
+    }
+  },
+  "bin": {
+    "stacklore": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
