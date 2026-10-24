@@ -13,7 +13,13 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+
+    // Source imports carry `.ts` extensions so Node's type stripping can
+    // resolve them directly when tests run against `src/`; the compiler
+    // rewrites them to `.js` on emit, so the published package is unaffected.
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test"]

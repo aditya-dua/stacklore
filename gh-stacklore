@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+#
+# GitHub CLI extension entry point.
+#
+# gh requires an extension's repository to be named `gh-<name>`, so this script
+# exists for a `gh-stacklore` companion repository that mirrors this one. When
+# stacklore is already installed, `stacklore gh-install` is the better route: it
+# writes a shim with absolute paths and needs no checkout at all.
+set -euo pipefail
+
+here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# A source checkout that has been built runs directly from its own output, so a
+# development version is never shadowed by a globally installed one.
+if [[ -f "$here/dist/cli.js" ]]; then
+  exec node "$here/dist/cli.js" "$@"
+fi
+
+if command -v stacklore >/dev/null 2>&1; then
+  exec stacklore "$@"
+fi
+
+cat >&2 <<'MSG'
+stacklore is not built or installed.
+
+  From a checkout:   npm install && npm run build
+  Or install it:     npm install -g stacklore && stacklore gh-install
+MSG
+exit 1
