@@ -3,23 +3,31 @@
  * redact, distill, and build a storable record.
  */
 
-import { resolveAdapter, type CaptureAdapter } from "./adapters/index.js";
-import { distillIntent } from "./distill.js";
-import { redact, redactAll } from "./redact.js";
-import { getStack, type PullRequestInfo } from "./stack.js";
+import { resolveAdapter, type CaptureAdapter } from "./adapters/index.ts";
+import { distillIntent } from "./distill.ts";
+import { runCommand, type CommandRunner } from "./exec.ts";
+import { redact, redactAll } from "./redact.ts";
+import { getStack, type PullRequestInfo } from "./stack.ts";
 import {
   SCHEMA_VERSION,
   type Exchange,
   type LoreRecord,
   type LoreStack,
   type RedactionReport,
-} from "./types.js";
+} from "./types.ts";
 
 export interface CaptureOptions {
   repo: string;
   adapter?: CaptureAdapter | null;
   adapterName?: string;
+  /**
+   * Adapters to choose from when none is supplied. Injected by tests; defaults
+   * to every adapter built in.
+   */
+  adapters?: CaptureAdapter[];
   includeResponses?: boolean;
+  /** Subprocess runner. Injected by tests; defaults to a real `spawn`. */
+  exec?: CommandRunner;
 }
 
 function mergeReports(reports: RedactionReport[]): RedactionReport {
@@ -38,7 +46,8 @@ export async function captureLayer(
   options: CaptureOptions,
 ): Promise<LoreRecord | null> {
   const adapter =
-    options.adapter ?? (await resolveAdapter(undefined, options.adapterName));
+    options.adapter ??
+    (await resolveAdapter(options.adapters, options.adapterName));
   if (!adapter) return null;
 
   const captures = await adapter.capture({
@@ -113,14 +122,19 @@ export async function captureStack(
   pr: number,
   options: Omit<CaptureOptions, "repo"> = {},
 ): Promise<LoreStack> {
-  const members = await getStack(repo, pr);
+  const members = await getStack(repo, pr, options.exec ?? runCommand);
   const adapter =
-    options.adapter ?? (await resolveAdapter(undefined, options.adapterName));
+    options.adapter ??
+    (await resolveAdapter(options.adapters, options.adapterName));
 
   const layers: LoreRecord[] = [];
-  for (const member of members) {
-    const record = await captureLayer(member, { ...options, repo, adapter });
-    if (record) layers.push(record);
+  // When no adapter is available there is nothing to capture, and probing once
+  // per layer would repeat the same failing detection for every pull request.
+  if (adapter) {
+    for (const member of members) {
+      const record = await captureLayer(member, { ...options, repo, adapter });
+      if (record) layers.push(record);
+    }
   }
 
   const head = members.find((m) => m.number === pr) ?? members[0];

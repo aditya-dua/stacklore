@@ -7,7 +7,7 @@
  * anything is persisted.
  */
 
-import type { RedactionReport } from "./types.js";
+import type { RedactionReport } from "./types.ts";
 
 export interface RedactionRule {
   name: string;

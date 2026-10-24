@@ -7,7 +7,7 @@
  * for a new tool.
  */
 
-import type { Exchange } from "../types.js";
+import type { Exchange } from "../types.ts";
 
 /** Raw, un-redacted capture for a single branch. Redaction happens downstream. */
 export interface CaptureResult {

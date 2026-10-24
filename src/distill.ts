@@ -6,7 +6,7 @@
  * change exists and rendered as a compact, reviewer-facing summary.
  */
 
-import type { Exchange, LoreRecord, LoreStack } from "./types.js";
+import type { Exchange, LoreRecord, LoreStack } from "./types.ts";
 
 /** Conversational filler that carries no intent. */
 const LOW_SIGNAL =

@@ -11,7 +11,7 @@ export const SCHEMA_VERSION = 1 as const;
 
 /** A pull request's position within a GitHub stack. */
 export interface StackPosition {
-  /** Stack identifier, when the PR belongs to a stack. */
+  /** Stack identifier, when the PR belongs to a GitHub-native stack. */
   number: number | null;
   /** 1-based position from the bottom of the stack. */
   position: number | null;
@@ -19,6 +19,13 @@ export interface StackPosition {
   size: number | null;
   /** The stack's trunk branch, e.g. `main`. */
   base: string | null;
+  /**
+   * How the topology was determined. `github` means GitHub reported a native
+   * stack; `inferred` means it was reconstructed from the chain of base
+   * branches. Absent on standalone pull requests and on records written before
+   * this field existed.
+   */
+  source?: "github" | "inferred";
 }
 
 /** A single captured prompt/response exchange. */

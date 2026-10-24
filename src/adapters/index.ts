@@ -2,11 +2,11 @@ export type {
   CaptureAdapter,
   CaptureQuery,
   CaptureResult,
-} from "./types.js";
-export { CopilotAdapter } from "./copilot.js";
+} from "./types.ts";
+export { CopilotAdapter, copilotDbPath } from "./copilot.ts";
 
-import type { CaptureAdapter } from "./types.js";
-import { CopilotAdapter } from "./copilot.js";
+import type { CaptureAdapter } from "./types.ts";
+import { CopilotAdapter } from "./copilot.ts";
 
 /** Adapters tried in order when none is explicitly selected. */
 export function defaultAdapters(): CaptureAdapter[] {

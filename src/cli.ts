@@ -6,19 +6,25 @@
  * installed as `gh-stacklore`.
  */
 
-import { captureStack } from "./capture.js";
-import { loadConfig, saveConfig, type StackloreConfig } from "./config.js";
-import { renderRecord, renderStackComment } from "./distill.js";
-import { resolveAdapter } from "./adapters/index.js";
-import { LoreStore } from "./store.js";
+import { captureStack } from "./capture.ts";
+import { loadConfig, saveConfig, type StackloreConfig } from "./config.ts";
+import { renderRecord, renderStackComment } from "./distill.ts";
+import { resolveAdapter } from "./adapters/index.ts";
+import { LoreStore } from "./store.ts";
+import {
+  EXTENSION_NAME,
+  extensionInstalled,
+  installExtension,
+  uninstallExtension,
+} from "./extension.ts";
 import {
   currentBranch,
   currentRepo,
-  getPullRequest,
+  getStack,
   pullRequestForBranch,
   upsertComment,
-} from "./stack.js";
-import type { LoreStack } from "./types.js";
+} from "./stack.ts";
+import type { LoreStack } from "./types.ts";
 
 const COMMENT_MARKER = "<!-- stacklore -->";
 
@@ -30,6 +36,8 @@ Usage
   stacklore show [--pr N]       Print stored lore for a pull request
   stacklore list                List captured records for this repo
   stacklore status              Show configuration and adapter availability
+  stacklore gh-install          Install as a 'gh stacklore' extension
+  stacklore gh-uninstall        Remove the 'gh stacklore' extension
 
 Options
   --pr <number>     Target pull request. Defaults to the current branch's PR.
@@ -119,8 +127,12 @@ async function cmdInit(args: Args): Promise<void> {
     fail(`store must be in 'owner/repo' form, got '${store}'`);
   }
 
-  console.log(`Creating private store ${store}…`);
-  await LoreStore.create(store);
+  const created = await LoreStore.create(store);
+  console.log(
+    created
+      ? `Created private store ${store}`
+      : `Store ${store} already exists — reusing it`,
+  );
 
   const config: StackloreConfig = {
     store,
@@ -251,6 +263,9 @@ async function cmdStatus(): Promise<void> {
   console.log(`config   ${config ? "found" : "missing (.stacklore.json)"}`);
   console.log(`store    ${config?.store ?? "—"}`);
   console.log(`adapter  ${adapter ? `${adapter.name} (available)` : "none available"}`);
+  console.log(
+    `gh ext   ${extensionInstalled() ? "installed" : "not installed (run 'stacklore gh-install')"}`,
+  );
 
   try {
     console.log(`repo     ${await currentRepo()}`);
@@ -260,14 +275,19 @@ async function cmdStatus(): Promise<void> {
       const repo = await currentRepo();
       const pr = await pullRequestForBranch(repo, branch);
       if (pr) {
-        const info = await getPullRequest(repo, pr);
-        console.log(
-          `pr       #${pr} ${
-            info.stack.number !== null
-              ? `(stack ${info.stack.number}, layer ${info.stack.position}/${info.stack.size})`
-              : "(not stacked)"
-          }`,
-        );
+        const layers = await getStack(repo, pr);
+        const self = layers.find((l) => l.number === pr);
+        const position = self?.stack.position;
+        const size = self?.stack.size;
+        const kind =
+          position && size
+            ? `(layer ${position}/${size}, ${
+                self?.stack.source === "github"
+                  ? `stack ${self.stack.number}`
+                  : "inferred from base branches"
+              })`
+            : "(not stacked)";
+        console.log(`pr       #${pr} ${kind}`);
       } else {
         console.log("pr       none open for this branch");
       }
@@ -277,7 +297,26 @@ async function cmdStatus(): Promise<void> {
   }
 }
 
+async function cmdGhInstall(): Promise<void> {
+  const { path, changed } = await installExtension();
+  console.log(
+    changed
+      ? `Installed ${EXTENSION_NAME} at ${path}`
+      : `${EXTENSION_NAME} is already up to date at ${path}`,
+  );
+  console.log("Run 'gh stacklore status' to confirm.");
+}
+
+async function cmdGhUninstall(): Promise<void> {
+  console.log(
+    (await uninstallExtension())
+      ? `Removed ${EXTENSION_NAME}.`
+      : `${EXTENSION_NAME} is not installed.`,
+  );
+}
+
 async function main(): Promise<void> {
+
   const args = parseArgs(process.argv.slice(2));
 
   switch (args.command) {
@@ -295,6 +334,12 @@ async function main(): Promise<void> {
       break;
     case "status":
       await cmdStatus();
+      break;
+    case "gh-install":
+      await cmdGhInstall();
+      break;
+    case "gh-uninstall":
+      await cmdGhUninstall();
       break;
     case "help":
     case "--help":

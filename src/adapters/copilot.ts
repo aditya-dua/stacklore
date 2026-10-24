@@ -7,18 +7,25 @@
  * commit-SHA join would not.
  */
 
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
-import type { Exchange } from "../types.js";
-import type { CaptureAdapter, CaptureQuery, CaptureResult } from "./types.js";
-
-const execFileAsync = promisify(execFile);
+import { runCommand, type CommandRunner } from "../exec.ts";
+import type { Exchange } from "../types.ts";
+import type { CaptureAdapter, CaptureQuery, CaptureResult } from "./types.ts";
 
 const DEFAULT_DB = join(homedir(), ".copilot", "session-store.db");
+
+/**
+ * Location of the Copilot session store.
+ *
+ * Overridable so the adapter can be pointed at a fixture database in tests and
+ * end-to-end runs without touching the user's real session history.
+ */
+export function copilotDbPath(env: NodeJS.ProcessEnv = process.env): string {
+  return env.STACKLORE_COPILOT_DB || DEFAULT_DB;
+}
 
 interface SessionRow {
   id: string;
@@ -28,12 +35,12 @@ interface SessionRow {
 }
 
 /** Run a query against the SQLite store and return JSON rows. */
-async function query<T>(dbPath: string, sql: string): Promise<T[]> {
-  const { stdout } = await execFileAsync(
-    "sqlite3",
-    ["-readonly", "-json", dbPath, sql],
-    { maxBuffer: 64 * 1024 * 1024 },
-  );
+async function query<T>(
+  exec: CommandRunner,
+  dbPath: string,
+  sql: string,
+): Promise<T[]> {
+  const stdout = await exec("sqlite3", ["-readonly", "-json", dbPath, sql]);
   const trimmed = stdout.trim();
   if (!trimmed) return [];
   return JSON.parse(trimmed) as T[];
@@ -47,15 +54,17 @@ function sqlString(value: string): string {
 export class CopilotAdapter implements CaptureAdapter {
   readonly name = "copilot";
   readonly #dbPath: string;
+  readonly #exec: CommandRunner;
 
-  constructor(dbPath: string = DEFAULT_DB) {
+  constructor(dbPath: string = copilotDbPath(), exec: CommandRunner = runCommand) {
     this.#dbPath = dbPath;
+    this.#exec = exec;
   }
 
   async isAvailable(): Promise<boolean> {
     if (!existsSync(this.#dbPath)) return false;
     try {
-      await execFileAsync("sqlite3", ["-version"]);
+      await this.#exec("sqlite3", ["-version"]);
       return true;
     } catch {
       return false;
@@ -72,6 +81,7 @@ export class CopilotAdapter implements CaptureAdapter {
     }
 
     const sessions = await query<SessionRow>(
+      this.#exec,
       this.#dbPath,
       `SELECT id, branch, repository, summary
          FROM sessions
@@ -90,6 +100,7 @@ export class CopilotAdapter implements CaptureAdapter {
         assistant_response: string | null;
         timestamp: string | null;
       }>(
+        this.#exec,
         this.#dbPath,
         `SELECT turn_index, user_message, assistant_response, timestamp
            FROM turns
@@ -100,6 +111,7 @@ export class CopilotAdapter implements CaptureAdapter {
       );
 
       const files = await query<{ file_path: string }>(
+        this.#exec,
         this.#dbPath,
         `SELECT DISTINCT file_path
            FROM session_files
@@ -139,6 +151,7 @@ export class CopilotAdapter implements CaptureAdapter {
   async linkedPullRequests(branch: string): Promise<number[]> {
     if (!(await this.isAvailable())) return [];
     const rows = await query<{ ref_value: string }>(
+      this.#exec,
       this.#dbPath,
       `SELECT DISTINCT r.ref_value
          FROM session_refs r
